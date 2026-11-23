@@ -358,6 +358,9 @@ def main():
                          "recursively (OGM-toolkit collect_smap_files convention)")
     ap.add_argument("--list-files", action="store_true",
                     help="only list the junction file(s) found for --junction and exit")
+    ap.add_argument("--no-reads-file", action="store_true",
+                    help="do not write annotated_reads.tsv (the large per-read file); "
+                         "only junction_summary.tsv and disagreements.tsv are written")
     ap.add_argument("--genes", help="gene annotation: BED or GTF/GFF (optionally .gz); required unless --list-files")
     ap.add_argument("--outdir", help="output directory; required unless --list-files")
     ap.add_argument("--feature", default="gene",
@@ -433,8 +436,12 @@ def main():
         """The other mode, always kept for comparison."""
         return a[k] if args.strand == "any" else a[k + "_any"]
 
-    with open(read_path, "w", newline="") as fh:
-        w = csv.writer(fh, delimiter="\t")
+    write_reads = not args.no_reads_file
+    if not write_reads:
+        print("      (--no-reads-file: skipping annotated_reads.tsv)", flush=True)
+    fh = open(read_path, "w", newline="") if write_reads else None
+    w = csv.writer(fh, delimiter="\t") if fh else None
+    if w:
         w.writerow([
             "source_file",
             "sample",
@@ -448,13 +455,14 @@ def main():
             "gene_seg1" + sec_suffix, "gene_seg2" + sec_suffix,
             "same_chrom", "strand_match",
         ])
-        for r in reads:
-            a = annotate_read(r, idx)
-            for k in ("donor", "acceptor", "seg1", "seg2"):
-                if prim(a, k) != ".":
-                    hits[k] += 1
-            key = (r["sample"], r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
-            groups[key].append((r, a))
+    for r in reads:
+        a = annotate_read(r, idx)
+        for k in ("donor", "acceptor", "seg1", "seg2"):
+            if prim(a, k) != ".":
+                hits[k] += 1
+        key = (r["sample"], r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
+        groups[key].append((r, a))
+        if w:
             w.writerow([
                 r["source_file"], r["sample"], r["read"], r["d_chr"], r["d_pos"], r["d_strand"],
                 r["a_chr"], r["a_pos"], r["a_strand"],
@@ -465,6 +473,8 @@ def main():
                 "yes" if r["d_chr"] == r["a_chr"] else "no",
                 "yes" if r["d_strand"] == r["a_strand"] else "no",
             ])
+    if fh:
+        fh.close()
 
     # ---- junction-level summary ----
     def event_class(r0, gd, ga):
@@ -532,9 +542,12 @@ def main():
     if unmatched:
         print(f"WARNING: junction chroms absent from gene file: {', '.join(unmatched)}")
     print(f"\noutputs in {args.outdir}/:")
-    print("  annotated_reads.tsv   — one row per split read, all 4 annotations (strand-aware + any)")
-    print("  junction_summary.tsv  — one row per breakpoint, sorted by supporting reads")
-    print("  disagreements.tsv     — breakpoints where the 4 annotations / strand modes differ")
+    if write_reads:
+        print("  annotated_reads.tsv   — one row per split read, all 4 annotations (both strands + aware)")
+    else:
+        print("  annotated_reads.tsv   — skipped (--no-reads-file)")
+    print("  junction_summary.tsv  — one row per sample+breakpoint, sorted by supporting reads")
+    print("  disagreements.tsv     — summary rows where the 4 annotations / strand modes differ")
 
 
 if __name__ == "__main__":

@@ -83,7 +83,9 @@ python3 scripts/annotate_junctions.py \
 
 # GTF instead of BED:            --genes gencode.v44.annotation.gtf --feature gene
 # keep only supported junctions: --min-reads 3
-# same-strand-only primary out:  --strand aware   (default: any = both strands captured)
+# same-strand-only primary out:  --strand aware   (default: any = both strands captured,
+#                                        every overlapping gene is listed, comma-joined)
+# skip the large per-read file:  --no-reads-file   (writes only the two summary TSVs)
 ```
 
 Try the bundled example first:
