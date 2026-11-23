@@ -95,19 +95,21 @@ CHR_TO_ACC = {
     "22": "NC_000022.11", "X": "NC_000023.11", "Y": "NC_000024.10",
     "M": "NC_012920.1", "MT": "NC_012920.1",
 }
-ACC_TO_CHR = {v: k for k, v in CHR_TO_ACC.items()}
-
-
 def norm_chrom(c: str, mode: str) -> str:
-    if mode == "exact":
-        return c
+    """Normalize a contig name for matching; matching is case-insensitive in
+    every mode. 'strip-chr' removes a leading chr (any case); 'accession'
+    maps chr-bodies and plain bodies (1/X/MT) to RefSeq accessions, accessions
+    pass through unchanged."""
+    body = c[3:] if c.lower().startswith("chr") else c
     if mode == "strip-chr":
-        return c[3:] if c.lower().startswith("chr") else c
-    if mode == "accession":
-        if c.lower().startswith("chr"):
-            return CHR_TO_ACC.get(c[3:], c)
-        return ACC_TO_CHR.get(c, c)
-    raise ValueError(mode)
+        out = body
+    elif mode == "accession":
+        out = CHR_TO_ACC.get(body.upper(), c)
+    elif mode == "exact":
+        out = c
+    else:
+        raise ValueError(mode)
+    return out.lower()
 
 
 def pick_chrom_mode(junction_chroms, gene_chroms):
