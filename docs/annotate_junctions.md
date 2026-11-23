@@ -42,7 +42,14 @@ chr19  580000  581000  GENE_A  0  +
 GTF/GFF works directly (reads the `gene_name` attribute) — e.g. GENCODE or NCBI
 annotation GTFs: `--genes gencode.v44.annotation.gtf --feature gene`.
 
-If your gene table is custom (e.g. 1-based `gene  chrom  start  end  strand`),
+**NCBI gene table** (the `Accession / Begin / End / Chromosome / Orientation /
+Name / Symbol / Gene ID / Gene Type / ...` layout — tab- or pipe-delimited, header
+optional) is supported natively: `Symbol` is used as the gene name, `Begin`
+(1-based) is converted to 0-based, `Orientation` (plus/minus) becomes the strand,
+and the plain `Chromosome` numbering (`1`) is auto-reconciled with `chr1` or
+`NC_000001.11` in the junction file. Try it: `--genes examples/chimeric_junction/genes_ncbi.tsv`.
+
+If your table is some other custom layout (e.g. 1-based `gene  chrom  start  end  strand`),
 convert to BED first, e.g.:
 
 ```bash

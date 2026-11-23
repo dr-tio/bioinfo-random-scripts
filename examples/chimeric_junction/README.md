@@ -25,3 +25,6 @@ Files:
 
 - `Chimeric.out.junction` — 4 synthetic split-read lines (14 cols, no header)
 - `genes.bed` — 4 genes, 6-col BED (0-based half-open)
+- `genes_ncbi.tsv` — same 4 genes as an NCBI gene table (Accession/Begin/End/
+  Chromosome/Orientation/.../Symbol), to test that format plus chromosome-name
+  reconciliation (`chr19` in the junction file vs `19` here)
