@@ -105,6 +105,29 @@ python3 scripts/annotate_junctions.py --junction path/to/runs_folder --list-file
 scripts/list_junction_files.sh path/to/runs_folder    # shell-only equivalent
 ```
 
+## 2b. Full pipeline runthrough
+
+```bash
+git pull
+# inputs (all gitignored, nothing data-like can be committed):
+#   data/SampleA.Chimeric.out.junction, data/SampleB.Chimeric.out.junction, ... , data/genes.xlsx
+
+# 1. gene table: Excel "Save As -> Text (Tab delimited) .txt" (or xlsx_to_tsv.py) -> data/genes.tsv
+# 2. optional cosmetic headers on the junction files (folder runs skip the copies):
+for f in $(scripts/list_junction_files.sh data/); do scripts/add_junction_header.sh "$f"; done
+# 3. annotate the whole folder at once — outputs are ALREADY pooled, one row per
+#    split read with source_file + sample columns:
+python3 scripts/annotate_junctions.py --junction data/ --genes data/genes.tsv --outdir data/results --min-reads 3
+# 4. outputs in data/results/:
+#      annotated_reads.tsv    pooled per-read annotations (all samples in one file)
+#      junction_summary.tsv   per sample + breakpoint, sorted by n_reads
+#      disagreements.tsv      where the 4 annotations / strand modes differ
+# 5. only needed if you annotated runs into SEPARATE outdirs — pool them after:
+python3 scripts/pool_annotated.py --which annotated_reads   --out data/results/pooled_reads.tsv   outA outB outC
+python3 scripts/pool_annotated.py --which junction_summary  --out data/results/pooled_summary.tsv outA outB outC
+python3 scripts/pool_annotated.py --which disagreements     --out data/results/pooled_disagreements.tsv outA outB outC
+```
+
 ## 3. Outputs (in `--outdir`)
 
 | File | Use it for |
