@@ -291,6 +291,16 @@ def main():
     if not args.list_files and (not args.genes or not args.outdir):
         ap.error("--genes and --outdir are required unless --list-files")
 
+    if args.list_files:
+        try:
+            jfiles = collect_junction_files(args.junction)
+        except ValueError as e:
+            sys.exit(f"ERROR: {e}")
+        for p in jfiles:
+            print(p)
+        print(f"{len(jfiles)} junction file(s) found", file=sys.stderr)
+        return
+
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
     feature = set(args.feature.split(","))
@@ -306,11 +316,6 @@ def main():
         jfiles = collect_junction_files(args.junction)
     except ValueError as e:
         sys.exit(f"ERROR: {e}")
-    if args.list_files:
-        for p in jfiles:
-            print(p)
-        print(f"{len(jfiles)} junction file(s) found", file=sys.stderr)
-        return
     if not jfiles:
         sys.exit(f"ERROR: no *.junction / *.junction.gz files found under {args.junction}")
     reads = []
