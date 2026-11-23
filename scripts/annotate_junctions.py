@@ -260,6 +260,10 @@ def collect_junction_files(input_path):
         found = []
         for root, _, files in os.walk(input_path):
             for f in sorted(files):
+                # skip header-added copies (*.with_header.junction) so a folder
+                # containing both original and headed files is not double-counted
+                if ".with_header." in f:
+                    continue
                 if f.lower().endswith(JUNCTION_SUFFIXES):
                     found.append(os.path.join(root, f))
         return sorted(found)
