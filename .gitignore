@@ -1,0 +1,12 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# analysis outputs / results directories
+results/
+results_*/
+
+# misc
+*.log
+.DS_Store
