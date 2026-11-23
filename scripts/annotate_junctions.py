@@ -42,8 +42,10 @@ Gene file accepted formats (auto-detected):
 Chromosome naming is auto-reconciled (chr1 vs 1 vs NC_000001.11).
 
 Outputs in --outdir:
-  annotated_reads.tsv   one row per junction line (per split read)
-  junction_summary.tsv  one row per unique donor/acceptor breakpoint, read counts, event class
+  annotated_reads.tsv   one row per junction line (per split read); source_file +
+                        sample columns identify the origin (sample = part of the
+                        file name before '.Chimeric.out.junction')
+  junction_summary.tsv  one row per sample + unique donor/acceptor breakpoint, read counts, event class
   disagreements.tsv     junctions where the annotations differ (strand-aware vs any,
                         donor vs acceptor gene, breakpoint vs segment gene)
 
@@ -270,6 +272,29 @@ def collect_junction_files(input_path):
     raise ValueError(f"input path not found: {input_path}")
 
 
+def sample_name(path):
+    """Sample label from the junction FILE NAME: the part before
+    '.Chimeric.out.junction' (e.g. 'SampleA.Chimeric.out.junction' -> 'SampleA').
+    Bare 'Chimeric.out.junction' -> parent folder name; other '*.junction'
+    names -> file stem."""
+    base = os.path.basename(path)
+    if base.lower().endswith(".gz"):
+        base = base[:-3]
+    low = base.lower()
+    marker = ".chimeric.out.junction"
+    if marker in low:
+        prefix = base[: low.index(marker)]
+        if prefix:
+            return prefix
+    if low == "chimeric.out.junction":
+        # bare DRAGEN file name -> parent folder
+        parent = os.path.basename(os.path.dirname(os.path.abspath(path)))
+        return parent or base
+    if low.endswith(".junction"):
+        return base[: -len(".junction")]
+    return base
+
+
 def parse_junctions(path):
     reads = []
     with open_text(path) as fh:
@@ -369,6 +394,7 @@ def main():
         rs = parse_junctions(p)
         for r in rs:
             r["source_file"] = p
+            r["sample"] = sample_name(p)
         reads.extend(rs)
         print(f"        {p}: {len(rs):,} lines", flush=True)
     print(f"      {len(reads):,} junction lines loaded from {len(jfiles)} file(s)", flush=True)
@@ -400,6 +426,7 @@ def main():
         w = csv.writer(fh, delimiter="\t")
         w.writerow([
             "source_file",
+            "sample",
             "read_name",
             "donor_chr", "donor_pos", "donor_strand",
             "acceptor_chr", "acceptor_pos", "acceptor_strand",
@@ -415,10 +442,10 @@ def main():
             for k in ("donor", "acceptor", "seg1", "seg2"):
                 if prim(a, k) != ".":
                     hits[k] += 1
-            key = (r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
+            key = (r["sample"], r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
             groups[key].append((r, a))
             w.writerow([
-                r["source_file"], r["read"], r["d_chr"], r["d_pos"], r["d_strand"],
+                r["source_file"], r["sample"], r["read"], r["d_chr"], r["d_pos"], r["d_strand"],
                 r["a_chr"], r["a_pos"], r["a_strand"],
                 r["d_chr"], r["s1_start"], a["s1_end"],
                 r["a_chr"], r["s2_start"], a["s2_end"],
@@ -444,11 +471,11 @@ def main():
     with open(summ_path, "w", newline="") as fs, open(dis_path, "w", newline="") as fd:
         ws = csv.writer(fs, delimiter="\t")
         wd = csv.writer(fd, delimiter="\t")
-        ws.writerow(["n_reads", "donor_chr", "donor_pos", "donor_strand",
+        ws.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
                      "acceptor_chr", "acceptor_pos", "acceptor_strand",
                      "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
                      "strand_match", "event_class"])
-        wd.writerow(["n_reads", "donor_chr", "donor_pos", "donor_strand",
+        wd.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
                      "acceptor_chr", "acceptor_pos", "acceptor_strand",
                      "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
                      "gene_donor_any", "gene_acceptor_any", "gene_seg1_any", "gene_seg2_any",

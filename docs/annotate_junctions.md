@@ -94,8 +94,10 @@ python3 scripts/annotate_junctions.py \
   --genes    examples/chimeric_junction/genes.bed \
   --outdir   /tmp/junction_results
 
-# folder of DRAGEN runs instead of a single file — every output row gets a
-# `source_file` column saying which file it came from:
+# folder of DRAGEN runs instead of a single file — every output row gets
+# `source_file` + `sample` columns (sample = part of the file name before
+# '.Chimeric.out.junction', e.g. SampleA.Chimeric.out.junction -> SampleA;
+# bare Chimeric.out.junction falls back to the parent folder):
 python3 scripts/annotate_junctions.py --junction path/to/runs_folder --genes genes.bed --outdir results
 
 # just list the junction files a folder input would pick up (no annotation):
@@ -107,8 +109,8 @@ scripts/list_junction_files.sh path/to/runs_folder    # shell-only equivalent
 
 | File | Use it for |
 |---|---|
-| `annotated_reads.tsv` | one row per split read (first column `source_file` when a folder was given); `gene_donor/acceptor/seg1/seg2` = primary annotation (both strands by default), `gene_*_aware` = same-strand-only view |
-| `junction_summary.tsv` | one row per unique donor/acceptor breakpoint, sorted by `n_reads`, with `event_class` |
+| `annotated_reads.tsv` | one row per split read; leading `source_file` + `sample` columns (folder input); `gene_donor/acceptor/seg1/seg2` = primary annotation (both strands by default), `gene_*_aware` = same-strand-only view |
+| `junction_summary.tsv` | one row per **sample +** donor/acceptor breakpoint, sorted by `n_reads`, with `event_class` |
 | `disagreements.tsv` | the "see the differences" file: rows where the annotations differ (strand-aware vs any, donor vs acceptor gene, breakpoint vs segment gene), with a `reasons` column |
 
 ## 4. How to read the results
