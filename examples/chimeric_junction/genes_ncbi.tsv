@@ -1,0 +1,5 @@
+Accession	Begin	End	Chromosome	Orientation	Name	Symbol	Gene ID	Gene Type	Transcripts accession	Protein accession	Protein length	Locus tag	Order	Size
+NC_000019.10	580000	581000	19	plus	demo gene A	GENE_A	1	gene	XR_000001.1				1	1001
+NC_000019.10	580300	580800	19	minus	demo antisense gene	GENE_ANTISENSE	2	gene	XR_000002.1				2	501
+NC_000012.12	120876000	120877000	12	plus	demo gene B	GENE_B	3	gene	XR_000003.1				3	1001
+NC_000019.10	600000	601000	19	plus	demo gene D	GENE_D	4	gene	XR_000004.1				4	1001
