@@ -19,4 +19,5 @@ if [[ ! -d "$input" ]]; then
     exit 1
 fi
 
-find "$input" -type f \( -name '*.junction' -o -name '*.junction.gz' \) | sort
+# exclude *.with_header.junction copies so folder runs don't double-count
+find "$input" -type f \( -name '*.junction' -o -name '*.junction.gz' \) ! -name '*.with_header.junction' | sort
