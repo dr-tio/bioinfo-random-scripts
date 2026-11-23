@@ -184,6 +184,8 @@ def load_genes(path, feature):
             if not line.strip() or line.startswith("#"):
                 continue
             f = split_row(line)
+            if f and f[0].lower() in ("track", "browser"):
+                continue  # UCSC BED header lines
             if fmt is None:
                 low = [c.lower() for c in f]
                 is_gff = len(f) >= 9 and f[3].isdigit() and f[4].isdigit() and not f[2].isdigit()
@@ -210,11 +212,12 @@ def load_genes(path, feature):
                     continue
                 genes.append(ncbi_gene(f, ncbi_idx))
             else:
-                if f[0].startswith(("track ", "browser ")):  # BED header lines
-                    continue
-                chrom, start, end = f[0], int(f[1]), int(f[2])
+                chrom = f[0]
+                start = int(f[1].replace(",", ""))   # tolerate thousands separators
+                end = int(f[2].replace(",", ""))
                 name = f[3] if len(f) > 3 else f"{chrom}:{start}-{end}"
-                strand = f[5] if len(f) > 5 and f[5] in "+-" else "."
+                strand_raw = f[5].lower() if len(f) > 5 else "."
+                strand = {"+": "+", "-": "-", "plus": "+", "minus": "-"}.get(strand_raw, ".")
                 genes.append(Gene(chrom, start, end, name, strand))
     return genes, fmt
 
