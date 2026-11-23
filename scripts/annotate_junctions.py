@@ -151,12 +151,16 @@ NCBI_DEFAULT_COLS = {"accession": 0, "begin": 1, "end": 2, "chromosome": 3,
 
 
 def split_row(line):
-    """Split a table row: pipe-delimited (markdown paste) or tab/whitespace."""
-    s = line.rstrip("\n")
+    """Split a table row: pipe-delimited (markdown paste) or tab/whitespace.
+    Tolerates CRLF endings and quote-wrapped cells (Excel text export)."""
+    s = line.rstrip("\r\n")
     if s.lstrip().startswith("|"):
-        return [c.strip() for c in s.strip().strip("|").split("|")]
-    f = s.split("\t")
-    return f if len(f) > 1 else s.split()
+        cells = [c.strip() for c in s.strip().strip("|").split("|")]
+    else:
+        f = s.split("\t")
+        cells = f if len(f) > 1 else s.split()
+    return [c.strip('"') if c.startswith('"') and c.endswith('"') and len(c) > 1 else c
+            for c in cells]
 
 
 def ncbi_gene(cells, idx):
@@ -206,6 +210,8 @@ def load_genes(path, feature):
                     continue
                 genes.append(ncbi_gene(f, ncbi_idx))
             else:
+                if f[0].startswith(("track ", "browser ")):  # BED header lines
+                    continue
                 chrom, start, end = f[0], int(f[1]), int(f[2])
                 name = f[3] if len(f) > 3 else f"{chrom}:{start}-{end}"
                 strand = f[5] if len(f) > 5 and f[5] in "+-" else "."
@@ -301,7 +307,7 @@ def parse_junctions(path):
         for line in fh:
             if not line.strip() or line[0] in "#@":
                 continue
-            f = line.rstrip("\n").split("\t")
+            f = line.rstrip("\r\n").split("\t")
             if len(f) < 14:
                 f = line.split()
             if len(f) < 14:
