@@ -34,6 +34,7 @@ Conventions:
 | `scripts/annotate_junctions.py` | Annotate DRAGEN RNA `Chimeric.out.junction` split-read breakpoints — donor, acceptor, segment 1 and segment 2 — with gene names (both strands captured, same-strand view kept alongside), plus a per-breakpoint summary and a disagreements report | `docs/annotate_junctions.md` |
 | `scripts/add_junction_header.sh` | Prepend a descriptive `#` header to a headerless `Chimeric.out.junction` | `docs/annotate_junctions.md` |
 | `scripts/list_junction_files.sh` | List all `*.junction` / `*.junction.gz` files under a folder (recursive), or echo a single file | `docs/annotate_junctions.md` |
+| `scripts/pool_annotated.py` | Pool per-run `annotated_reads` / `junction_summary` / `disagreements` TSVs into one file (for separately-annotated runs) | `docs/annotate_junctions.md` |
 
 ## Quick start (junction annotation)
 

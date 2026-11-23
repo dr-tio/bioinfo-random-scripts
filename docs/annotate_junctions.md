@@ -94,8 +94,10 @@ python3 scripts/annotate_junctions.py \
   --genes    examples/chimeric_junction/genes.bed \
   --outdir   /tmp/junction_results
 
-# folder of DRAGEN runs instead of a single file — every output row gets a
-# `source_file` column saying which file it came from:
+# folder of DRAGEN runs instead of a single file — every output row gets
+# `source_file` + `sample` columns (sample = part of the file name before
+# '.Chimeric.out.junction', e.g. SampleA.Chimeric.out.junction -> SampleA;
+# bare Chimeric.out.junction falls back to the parent folder):
 python3 scripts/annotate_junctions.py --junction path/to/runs_folder --genes genes.bed --outdir results
 
 # just list the junction files a folder input would pick up (no annotation):
@@ -103,12 +105,35 @@ python3 scripts/annotate_junctions.py --junction path/to/runs_folder --list-file
 scripts/list_junction_files.sh path/to/runs_folder    # shell-only equivalent
 ```
 
+## 2b. Full pipeline runthrough
+
+```bash
+git pull
+# inputs (all gitignored, nothing data-like can be committed):
+#   data/SampleA.Chimeric.out.junction, data/SampleB.Chimeric.out.junction, ... , data/genes.xlsx
+
+# 1. gene table: Excel "Save As -> Text (Tab delimited) .txt" (or xlsx_to_tsv.py) -> data/genes.tsv
+# 2. optional cosmetic headers on the junction files (folder runs skip the copies):
+for f in $(scripts/list_junction_files.sh data/); do scripts/add_junction_header.sh "$f"; done
+# 3. annotate the whole folder at once — outputs are ALREADY pooled, one row per
+#    split read with source_file + sample columns:
+python3 scripts/annotate_junctions.py --junction data/ --genes data/genes.tsv --outdir data/results --min-reads 3
+# 4. outputs in data/results/:
+#      annotated_reads.tsv    pooled per-read annotations (all samples in one file)
+#      junction_summary.tsv   per sample + breakpoint, sorted by n_reads
+#      disagreements.tsv      where the 4 annotations / strand modes differ
+# 5. only needed if you annotated runs into SEPARATE outdirs — pool them after:
+python3 scripts/pool_annotated.py --which annotated_reads   --out data/results/pooled_reads.tsv   outA outB outC
+python3 scripts/pool_annotated.py --which junction_summary  --out data/results/pooled_summary.tsv outA outB outC
+python3 scripts/pool_annotated.py --which disagreements     --out data/results/pooled_disagreements.tsv outA outB outC
+```
+
 ## 3. Outputs (in `--outdir`)
 
 | File | Use it for |
 |---|---|
-| `annotated_reads.tsv` | one row per split read (first column `source_file` when a folder was given); `gene_donor/acceptor/seg1/seg2` = primary annotation (both strands by default), `gene_*_aware` = same-strand-only view |
-| `junction_summary.tsv` | one row per unique donor/acceptor breakpoint, sorted by `n_reads`, with `event_class` |
+| `annotated_reads.tsv` | one row per split read; leading `source_file` + `sample` columns (folder input); `gene_donor/acceptor/seg1/seg2` = primary annotation (both strands by default), `gene_*_aware` = same-strand-only view |
+| `junction_summary.tsv` | one row per **sample +** donor/acceptor breakpoint, sorted by `n_reads`, with `event_class` |
 | `disagreements.tsv` | the "see the differences" file: rows where the annotations differ (strand-aware vs any, donor vs acceptor gene, breakpoint vs segment gene), with a `reasons` column |
 
 ## 4. How to read the results
