@@ -35,6 +35,10 @@ would have changed the call. Switch primary with --strand aware.
 Gene file accepted formats (auto-detected):
   - BED:  chrom start end [name] [score] [strand]   (0-based half-open)
   - GTF/GFF: use --feature gene (default) and gene_name/Name/gene_id is used
+  - NCBI gene table (Accession/Begin/End/Chromosome/Orientation/Name/Symbol/
+    Gene ID/...; tab- or pipe-delimited, header optional): Symbol is used as
+    the gene name, Begin (1-based) is converted to 0-based, Orientation
+    (plus/minus) becomes the strand, Chromosome (plain "1") is used as contig.
 Chromosome naming is auto-reconciled (chr1 vs 1 vs NC_000001.11).
 
 Outputs in --outdir:
@@ -140,19 +144,53 @@ def parse_attributes(attr: str):
     return out
 
 
+NCBI_DEFAULT_COLS = {"accession": 0, "begin": 1, "end": 2, "chromosome": 3,
+                     "orientation": 4, "name": 5, "symbol": 6, "gene id": 7, "gene type": 8}
+
+
+def split_row(line):
+    """Split a table row: pipe-delimited (markdown paste) or tab/whitespace."""
+    s = line.rstrip("\n")
+    if s.lstrip().startswith("|"):
+        return [c.strip() for c in s.strip().strip("|").split("|")]
+    f = s.split("\t")
+    return f if len(f) > 1 else s.split()
+
+
+def ncbi_gene(cells, idx):
+    def g(key):
+        i = idx.get(key)
+        return cells[i] if i is not None and i < len(cells) else ""
+    chrom = g("chromosome") or g("accession")
+    start = int(g("begin").replace(",", "")) - 1   # NCBI Begin is 1-based -> BED 0-based
+    end = int(g("end").replace(",", ""))
+    name = g("symbol") or g("name") or f"{chrom}:{start}-{end}"
+    strand = {"plus": "+", "minus": "-", "+": "+", "-": "-"}.get(g("orientation").lower(), ".")
+    return Gene(chrom, start, end, name, strand)
+
+
 def load_genes(path, feature):
-    """Return list of Gene. Auto-detects BED vs GTF/GFF."""
+    """Return (list of Gene, format). Auto-detects BED vs GTF/GFF vs NCBI gene table."""
     genes, fmt = [], None
+    ncbi_idx = dict(NCBI_DEFAULT_COLS)
     with open_text(path) as fh:
         for line in fh:
             if not line.strip() or line.startswith("#"):
                 continue
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 3:
-                f = line.split()
+            f = split_row(line)
             if fmt is None:
+                low = [c.lower() for c in f]
                 is_gff = len(f) >= 9 and f[3].isdigit() and f[4].isdigit() and not f[2].isdigit()
-                fmt = "gff" if is_gff else "bed"
+                if is_gff:
+                    fmt = "gff"
+                elif "accession" in low and "begin" in low:
+                    fmt = "ncbi"                       # header row: map columns by name
+                    ncbi_idx = {c.strip().lower(): i for i, c in enumerate(f)}
+                    continue
+                elif f[0].startswith("NC_"):
+                    fmt = "ncbi"                       # headerless NCBI table, positional
+                else:
+                    fmt = "bed"
             if fmt == "gff":
                 if len(f) < 9 or f[2] not in feature:
                     continue
@@ -161,6 +199,10 @@ def load_genes(path, feature):
                         or attrs.get("gene_id") or attrs.get("ID")
                         or attrs.get("transcript_name") or f[2])
                 genes.append(Gene(f[0], int(f[3]) - 1, int(f[4]), name, f[6] if f[6] in "+-" else "."))
+            elif fmt == "ncbi":
+                if len(f) < 3 or not f[ncbi_idx["begin"]].replace(",", "").isdigit():
+                    continue
+                genes.append(ncbi_gene(f, ncbi_idx))
             else:
                 chrom, start, end = f[0], int(f[1]), int(f[2])
                 name = f[3] if len(f) > 3 else f"{chrom}:{start}-{end}"
