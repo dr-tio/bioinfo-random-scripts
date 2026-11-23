@@ -1,12 +1,55 @@
-# python
+# ==================================================================
+# bioinfo-random-scripts — .gitignore
+# Policy: raw data and results are NEVER tracked.
+# Only code, docs/ and small synthetic examples/ are tracked.
+# ==================================================================
+
+# ---------- Python ----------
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
 
-# analysis outputs / results directories
-results/
-results_*/
+# ---------- reads, alignments, variant & junction calls ----------
+*.fastq *.fq *.fastq.gz *.fq.gz
+*.bam *.sam *.cram *.bai *.crai
+*.vcf *.vcf.gz *.bcf *.maf *.maf.gz
+*.junction *.junction.gz
+*.smap *.smap.gz
 
-# misc
-*.log
+# ---------- reference genomes & annotation files (data) ----------
+*.fa *.fasta *.fna *.fai
+*.fa.gz *.fasta.gz *.fna.gz
+*.gtf *.gff *.gff3 *.gtf.gz *.gff.gz
+*.bed *.bed.gz
+
+# ---------- tabular / plain-text data ----------
+*.tsv *.csv *.tab *.txt *.log
+*.xlsx *.xls
+
+# ---------- archives, compressed & big binary files ----------
+*.gz *.bz2 *.xz *.zip *.tar *.tgz *.tar.gz *.7z *.rar
+*.h5 *.hdf5 *.hdf *.bigWig *.bw *.bedGraph *.wig
+*.db *.sqlite *.sqlite3
+
+# ---------- data & output directories (any depth) ----------
+data/*
+results*/
+output/
+out/
+work/
+tmp/
+
+# ---------- exceptions: keep the data/ placeholder, docs and examples ----------
+!data/README.md
+!docs/**
+!examples/**
+
+# ---------- OS / editor ----------
 .DS_Store
+Thumbs.db
+*.swp
+*~

@@ -3,6 +3,10 @@
 annotate_junctions.py — annotate DRAGEN RNA `Chimeric.out.junction` split-read
 breakpoints with gene names.
 
+--junction accepts a single file OR a folder; for a folder, all
+*.junction / *.junction.gz files are collected recursively (same convention as
+OGM-toolkit's process_smap.collect_smap_files). --list-files just prints them.
+
 Each line of Chimeric.out.junction = one chimerically aligned read (14 columns):
   1  donor chromosome
   2  first base of the donor intron (1-based)
@@ -201,6 +205,25 @@ class GeneIndex:
 
 
 # ------------------------------------------------------------ junctions ----
+JUNCTION_SUFFIXES = (".junction", ".junction.gz")
+
+
+def collect_junction_files(input_path):
+    """Same convention as OGM-toolkit process_smap.collect_smap_files:
+    a file -> [file]; a directory -> every *.junction / *.junction.gz found
+    recursively, sorted; anything else -> error."""
+    if os.path.isfile(input_path):
+        return [input_path]
+    if os.path.isdir(input_path):
+        found = []
+        for root, _, files in os.walk(input_path):
+            for f in sorted(files):
+                if f.lower().endswith(JUNCTION_SUFFIXES):
+                    found.append(os.path.join(root, f))
+        return sorted(found)
+    raise ValueError(f"input path not found: {input_path}")
+
+
 def parse_junctions(path):
     reads = []
     with open_text(path) as fh:
@@ -247,9 +270,14 @@ def annotate_read(r, idx):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--junction", required=True, help="Chimeric.out.junction (optionally .gz)")
-    ap.add_argument("--genes", required=True, help="gene annotation: BED or GTF/GFF (optionally .gz)")
-    ap.add_argument("--outdir", required=True, help="output directory")
+    ap.add_argument("--junction", required=True,
+                    help="a Chimeric.out.junction file (optionally .gz) OR a folder — for a "
+                         "folder, all *.junction / *.junction.gz files are collected "
+                         "recursively (OGM-toolkit collect_smap_files convention)")
+    ap.add_argument("--list-files", action="store_true",
+                    help="only list the junction file(s) found for --junction and exit")
+    ap.add_argument("--genes", help="gene annotation: BED or GTF/GFF (optionally .gz); required unless --list-files")
+    ap.add_argument("--outdir", help="output directory; required unless --list-files")
     ap.add_argument("--feature", default="gene",
                     help="GFF/GTF feature(s) to use, comma-separated (default: gene)")
     ap.add_argument("--chrom-mode", choices=["auto", "exact", "strip-chr", "accession"], default="auto",
@@ -260,8 +288,21 @@ def main():
                     help="primary annotation mode: 'any' = capture genes on BOTH strands (default); "
                          "'aware' = same-strand only. The other mode is always kept in *_aware/*_any columns")
     args = ap.parse_args()
+    if not args.list_files and (not args.genes or not args.outdir):
+        ap.error("--genes and --outdir are required unless --list-files")
 
-    os.makedirs(args.outdir, exist_ok=True)
+    if args.list_files:
+        try:
+            jfiles = collect_junction_files(args.junction)
+        except ValueError as e:
+            sys.exit(f"ERROR: {e}")
+        for p in jfiles:
+            print(p)
+        print(f"{len(jfiles)} junction file(s) found", file=sys.stderr)
+        return
+
+    if args.outdir:
+        os.makedirs(args.outdir, exist_ok=True)
     feature = set(args.feature.split(","))
 
     print(f"[1/4] loading genes from {args.genes} ...", flush=True)
@@ -270,11 +311,23 @@ def main():
     if not genes:
         sys.exit("ERROR: no gene records parsed — check --genes file format")
 
-    print(f"[2/4] loading junctions from {args.junction} ...", flush=True)
-    reads = parse_junctions(args.junction)
-    print(f"      {len(reads):,} junction lines loaded", flush=True)
+    print(f"[2/4] collecting junction files from {args.junction} ...", flush=True)
+    try:
+        jfiles = collect_junction_files(args.junction)
+    except ValueError as e:
+        sys.exit(f"ERROR: {e}")
+    if not jfiles:
+        sys.exit(f"ERROR: no *.junction / *.junction.gz files found under {args.junction}")
+    reads = []
+    for p in jfiles:
+        rs = parse_junctions(p)
+        for r in rs:
+            r["source_file"] = p
+        reads.extend(rs)
+        print(f"        {p}: {len(rs):,} lines", flush=True)
+    print(f"      {len(reads):,} junction lines loaded from {len(jfiles)} file(s)", flush=True)
     if not reads:
-        sys.exit("ERROR: no junction lines parsed — check --junction file")
+        sys.exit("ERROR: no junction lines parsed — check --junction input")
 
     jch = {r["d_chr"] for r in reads} | {r["a_chr"] for r in reads}
     gch = {g.chrom for g in genes}
@@ -300,6 +353,7 @@ def main():
     with open(read_path, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t")
         w.writerow([
+            "source_file",
             "read_name",
             "donor_chr", "donor_pos", "donor_strand",
             "acceptor_chr", "acceptor_pos", "acceptor_strand",
@@ -318,7 +372,7 @@ def main():
             key = (r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
             groups[key].append((r, a))
             w.writerow([
-                r["read"], r["d_chr"], r["d_pos"], r["d_strand"],
+                r["source_file"], r["read"], r["d_chr"], r["d_pos"], r["d_strand"],
                 r["a_chr"], r["a_pos"], r["a_strand"],
                 r["d_chr"], r["s1_start"], a["s1_end"],
                 r["a_chr"], r["s2_start"], a["s2_end"],
