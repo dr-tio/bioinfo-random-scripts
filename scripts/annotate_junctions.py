@@ -109,7 +109,13 @@ def norm_chrom(c: str, mode: str) -> str:
         out = c
     else:
         raise ValueError(mode)
-    return out.lower()
+    out = out.lower()
+    # mitochondrial contig alias: chrM / chrMT / M / MT are the same contig
+    # (DRAGEN writes chrM, NCBI tables write MT)
+    b = out[3:] if out.startswith("chr") else out
+    if b in ("m", "mt"):
+        out = "chrmt" if out.startswith("chr") else "mt"
+    return out
 
 
 def pick_chrom_mode(junction_chroms, gene_chroms):

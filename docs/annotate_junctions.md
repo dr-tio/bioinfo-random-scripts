@@ -61,8 +61,10 @@ Gotchas:
 - The **assembly must match the DRAGEN run's reference** (GRCh38 vs hg19). The
   script prints the chromosome-match % at startup, so a mismatch is obvious.
 - Chromosome naming (`chr19` vs `19` vs `NC_000019.10`) is auto-reconciled
-  (`--chrom-mode` to force). Extra scaffolds in the gene file (HLA, decoys,
-  `chrUn_*`, alts) are harmless — they simply never match.
+  (`--chrom-mode` to force), case-insensitively, and the mitochondrial contig is
+  aliased (`chrM` / `chrMT` / `M` / `MT` / `NC_012920.1` all match). Extra
+  scaffolds in the gene file (HLA, decoys, `chrUn_*`, alts) are harmless — they
+  simply never match.
 - `.gz` inputs work.
 
 ## 1. Quick sanity check on inputs (30 s)
