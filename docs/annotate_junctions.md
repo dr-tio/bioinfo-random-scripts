@@ -83,7 +83,11 @@ python3 scripts/annotate_junctions.py \
 
 # GTF instead of BED:            --genes gencode.v44.annotation.gtf --feature gene
 # keep only supported junctions: --min-reads 3
-# same-strand-only primary out:  --strand aware   (default: any = both strands captured)
+# same-strand-only primary out:  --strand aware   (default: any = both strands captured,
+#                                        every overlapping gene is listed, comma-joined)
+# skip the large per-read file:  --no-reads-file   (writes only the two summary TSVs)
+# genes only, nothing else:      --minimal           (writes ONLY junction_genes.tsv:
+#                                     sample + breakpoint coords + the 4 gene columns)
 ```
 
 Try the bundled example first:
@@ -129,6 +133,11 @@ python3 scripts/pool_annotated.py --which disagreements     --out data/results/p
 ```
 
 ## 3. Outputs (in `--outdir`)
+
+With `--minimal`, the only output is **`junction_genes.tsv`**:
+`sample, donor_chr, donor_pos, donor_strand, acceptor_chr, acceptor_pos, acceptor_strand, gene_donor, gene_acceptor, gene_seg1, gene_seg2` — every overlapping gene (both strands), comma-joined.
+
+Otherwise:
 
 | File | Use it for |
 |---|---|
