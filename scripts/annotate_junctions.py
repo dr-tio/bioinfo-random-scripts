@@ -518,11 +518,11 @@ def main():
         min_path = os.path.join(args.outdir, "junction_genes.tsv")
         with open(min_path, "w", newline="") as fm:
             wm = csv.writer(fm, delimiter="\t")
-            wm.writerow(["sample", "donor_chr", "donor_pos", "donor_strand",
+            wm.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
                          "acceptor_chr", "acceptor_pos", "acceptor_strand",
                          "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2", "all_genes"])
             for n, key, gd, ga, g1, g2, sm, ec, a0, all_g in rows:
-                wm.writerow([*key, gd, ga, g1, g2, all_g])
+                wm.writerow([n, *key, gd, ga, g1, g2, all_g])
     else:
         summ_path = os.path.join(args.outdir, "junction_summary.tsv")
         dis_path = os.path.join(args.outdir, "disagreements.tsv")
