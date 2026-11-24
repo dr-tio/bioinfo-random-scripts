@@ -135,7 +135,7 @@ python3 scripts/pool_annotated.py --which disagreements     --out data/results/p
 ## 3. Outputs (in `--outdir`)
 
 With `--minimal`, the only output is **`junction_genes.tsv`**:
-`sample, donor_chr, donor_pos, donor_strand, acceptor_chr, acceptor_pos, acceptor_strand, gene_donor, gene_acceptor, gene_seg1, gene_seg2` — every overlapping gene (both strands), comma-joined.
+`sample, donor_chr, donor_pos, donor_strand, acceptor_chr, acceptor_pos, acceptor_strand, gene_donor, gene_acceptor, gene_seg1, gene_seg2, all_genes` — every overlapping gene (both strands), comma-joined; `all_genes` = the deduplicated union of the four gene columns for that row.
 
 Otherwise:
 
