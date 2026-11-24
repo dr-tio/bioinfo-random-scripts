@@ -361,6 +361,10 @@ def main():
     ap.add_argument("--no-reads-file", action="store_true",
                     help="do not write annotated_reads.tsv (the large per-read file); "
                          "only junction_summary.tsv and disagreements.tsv are written")
+    ap.add_argument("--minimal", action="store_true",
+                    help="write ONLY junction_genes.tsv: sample + breakpoint coords + the 4 gene "
+                         "columns (every overlapping gene, both strands). Implies --no-reads-file; "
+                         "skips junction_summary.tsv and disagreements.tsv")
     ap.add_argument("--genes", help="gene annotation: BED or GTF/GFF (optionally .gz); required unless --list-files")
     ap.add_argument("--outdir", help="output directory; required unless --list-files")
     ap.add_argument("--feature", default="gene",
@@ -436,9 +440,9 @@ def main():
         """The other mode, always kept for comparison."""
         return a[k] if args.strand == "any" else a[k + "_any"]
 
-    write_reads = not args.no_reads_file
+    write_reads = not (args.no_reads_file or args.minimal)
     if not write_reads:
-        print("      (--no-reads-file: skipping annotated_reads.tsv)", flush=True)
+        print("      (per-read file skipped: --no-reads-file/--minimal)", flush=True)
     fh = open(read_path, "w", newline="") if write_reads else None
     w = csv.writer(fh, delimiter="\t") if fh else None
     if w:
@@ -486,50 +490,61 @@ def main():
             return "intragenic_same_gene"
         return "same_chrom_diff_genes"
 
-    summ_path = os.path.join(args.outdir, "junction_summary.tsv")
-    dis_path = os.path.join(args.outdir, "disagreements.tsv")
+    rows = []
+    for key, items in groups.items():
+        if len(items) < args.min_reads:
+            continue
+        r0, a0 = items[0]
+        gd = ",".join(sorted({prim(a, "donor") for _, a in items} - {"."})) or "."
+        ga = ",".join(sorted({prim(a, "acceptor") for _, a in items} - {"."})) or "."
+        g1 = ",".join(sorted({prim(a, "seg1") for _, a in items} - {"."})) or "."
+        g2 = ",".join(sorted({prim(a, "seg2") for _, a in items} - {"."})) or "."
+        strand_match = "yes" if r0["d_strand"] == r0["a_strand"] else "no"
+        rows.append((len(items), key, gd, ga, g1, g2, strand_match, event_class(r0, gd, ga), a0))
+    rows.sort(key=lambda x: -x[0])
+
     n_dis = 0
-    with open(summ_path, "w", newline="") as fs, open(dis_path, "w", newline="") as fd:
-        ws = csv.writer(fs, delimiter="\t")
-        wd = csv.writer(fd, delimiter="\t")
-        ws.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
-                     "acceptor_chr", "acceptor_pos", "acceptor_strand",
-                     "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
-                     "strand_match", "event_class"])
-        wd.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
-                     "acceptor_chr", "acceptor_pos", "acceptor_strand",
-                     "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
-                     "gene_donor_any", "gene_acceptor_any", "gene_seg1_any", "gene_seg2_any",
-                     "reasons"])
-        rows = []
-        for key, items in groups.items():
-            if len(items) < args.min_reads:
-                continue
-            r0, a0 = items[0]
-            gd = ",".join(sorted({prim(a, "donor") for _, a in items} - {"."})) or "."
-            ga = ",".join(sorted({prim(a, "acceptor") for _, a in items} - {"."})) or "."
-            g1 = ",".join(sorted({prim(a, "seg1") for _, a in items} - {"."})) or "."
-            g2 = ",".join(sorted({prim(a, "seg2") for _, a in items} - {"."})) or "."
-            strand_match = "yes" if r0["d_strand"] == r0["a_strand"] else "no"
-            rows.append((len(items), key, gd, ga, g1, g2, strand_match, event_class(r0, gd, ga), a0))
-        rows.sort(key=lambda x: -x[0])
-        for n, key, gd, ga, g1, g2, sm, ec, a0 in rows:
-            ws.writerow([n, *key, gd, ga, g1, g2, sm, ec])
-            reasons = []
-            if a0["donor"] != a0["donor_any"] or a0["acceptor"] != a0["acceptor_any"] \
-               or a0["seg1"] != a0["seg1_any"] or a0["seg2"] != a0["seg2_any"]:
-                reasons.append("strand_matters")
-            if gd != ga:
-                reasons.append("donor_vs_acceptor_gene_differ")
-            if gd != "." and g1 != "." and gd not in g1:
-                reasons.append("seg1_gene != donor_gene")
-            if ga != "." and g2 != "." and ga not in g2:
-                reasons.append("seg2_gene != acceptor_gene")
-            if reasons:
-                n_dis += 1
-                wd.writerow([n, *key, gd, ga, g1, g2,
-                             a0["donor_any"], a0["acceptor_any"], a0["seg1_any"], a0["seg2_any"],
-                             ";".join(reasons)])
+    if args.minimal:
+        min_path = os.path.join(args.outdir, "junction_genes.tsv")
+        with open(min_path, "w", newline="") as fm:
+            wm = csv.writer(fm, delimiter="\t")
+            wm.writerow(["sample", "donor_chr", "donor_pos", "donor_strand",
+                         "acceptor_chr", "acceptor_pos", "acceptor_strand",
+                         "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2"])
+            for n, key, gd, ga, g1, g2, sm, ec, a0 in rows:
+                wm.writerow([*key, gd, ga, g1, g2])
+    else:
+        summ_path = os.path.join(args.outdir, "junction_summary.tsv")
+        dis_path = os.path.join(args.outdir, "disagreements.tsv")
+        with open(summ_path, "w", newline="") as fs, open(dis_path, "w", newline="") as fd:
+            ws = csv.writer(fs, delimiter="\t")
+            wd = csv.writer(fd, delimiter="\t")
+            ws.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
+                         "acceptor_chr", "acceptor_pos", "acceptor_strand",
+                         "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
+                         "strand_match", "event_class"])
+            wd.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
+                         "acceptor_chr", "acceptor_pos", "acceptor_strand",
+                         "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
+                         "gene_donor_any", "gene_acceptor_any", "gene_seg1_any", "gene_seg2_any",
+                         "reasons"])
+            for n, key, gd, ga, g1, g2, sm, ec, a0 in rows:
+                ws.writerow([n, *key, gd, ga, g1, g2, sm, ec])
+                reasons = []
+                if a0["donor"] != a0["donor_any"] or a0["acceptor"] != a0["acceptor_any"] \
+                   or a0["seg1"] != a0["seg1_any"] or a0["seg2"] != a0["seg2_any"]:
+                    reasons.append("strand_matters")
+                if gd != ga:
+                    reasons.append("donor_vs_acceptor_gene_differ")
+                if gd != "." and g1 != "." and gd not in g1:
+                    reasons.append("seg1_gene != donor_gene")
+                if ga != "." and g2 != "." and ga not in g2:
+                    reasons.append("seg2_gene != acceptor_gene")
+                if reasons:
+                    n_dis += 1
+                    wd.writerow([n, *key, gd, ga, g1, g2,
+                                 a0["donor_any"], a0["acceptor_any"], a0["seg1_any"], a0["seg2_any"],
+                                 ";".join(reasons)])
 
     print("\n===== done =====")
     print(f"junction lines annotated : {len(reads):,}")
@@ -542,12 +557,15 @@ def main():
     if unmatched:
         print(f"WARNING: junction chroms absent from gene file: {', '.join(unmatched)}")
     print(f"\noutputs in {args.outdir}/:")
-    if write_reads:
-        print("  annotated_reads.tsv   — one row per split read, all 4 annotations (both strands + aware)")
+    if args.minimal:
+        print("  junction_genes.tsv    — ONLY output (--minimal): sample + breakpoint + 4 gene columns")
     else:
-        print("  annotated_reads.tsv   — skipped (--no-reads-file)")
-    print("  junction_summary.tsv  — one row per sample+breakpoint, sorted by supporting reads")
-    print("  disagreements.tsv     — summary rows where the 4 annotations / strand modes differ")
+        if write_reads:
+            print("  annotated_reads.tsv   — one row per split read, all 4 annotations (both strands + aware)")
+        else:
+            print("  annotated_reads.tsv   — skipped (--no-reads-file)")
+        print("  junction_summary.tsv  — one row per sample+breakpoint, sorted by supporting reads")
+        print("  disagreements.tsv     — summary rows where the 4 annotations / strand modes differ")
 
 
 if __name__ == "__main__":
