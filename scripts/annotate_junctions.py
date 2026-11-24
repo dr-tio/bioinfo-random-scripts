@@ -457,13 +457,15 @@ def main():
             "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
             "gene_donor" + sec_suffix, "gene_acceptor" + sec_suffix,
             "gene_seg1" + sec_suffix, "gene_seg2" + sec_suffix,
-            "same_chrom", "strand_match",
+            "same_chrom", "strand_match", "all_genes",
         ])
     for r in reads:
         a = annotate_read(r, idx)
         for k in ("donor", "acceptor", "seg1", "seg2"):
             if prim(a, k) != ".":
                 hits[k] += 1
+        all_g = ",".join(sorted({g for k in ("donor", "acceptor", "seg1", "seg2")
+                                 for g in prim(a, k).split(",") if g != "."})) or "."
         key = (r["sample"], r["d_chr"], r["d_pos"], r["d_strand"], r["a_chr"], r["a_pos"], r["a_strand"])
         groups[key].append((r, a))
         if w:
@@ -476,6 +478,7 @@ def main():
                 sec(a, "donor"), sec(a, "acceptor"), sec(a, "seg1"), sec(a, "seg2"),
                 "yes" if r["d_chr"] == r["a_chr"] else "no",
                 "yes" if r["d_strand"] == r["a_strand"] else "no",
+                all_g,
             ])
     if fh:
         fh.close()
@@ -500,7 +503,8 @@ def main():
         g1 = ",".join(sorted({prim(a, "seg1") for _, a in items} - {"."})) or "."
         g2 = ",".join(sorted({prim(a, "seg2") for _, a in items} - {"."})) or "."
         strand_match = "yes" if r0["d_strand"] == r0["a_strand"] else "no"
-        rows.append((len(items), key, gd, ga, g1, g2, strand_match, event_class(r0, gd, ga), a0))
+        all_g = ",".join(sorted({g for s in (gd, ga, g1, g2) for g in s.split(",") if g != "."})) or "."
+        rows.append((len(items), key, gd, ga, g1, g2, strand_match, event_class(r0, gd, ga), a0, all_g))
     rows.sort(key=lambda x: -x[0])
 
     n_dis = 0
@@ -510,9 +514,9 @@ def main():
             wm = csv.writer(fm, delimiter="\t")
             wm.writerow(["sample", "donor_chr", "donor_pos", "donor_strand",
                          "acceptor_chr", "acceptor_pos", "acceptor_strand",
-                         "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2"])
-            for n, key, gd, ga, g1, g2, sm, ec, a0 in rows:
-                wm.writerow([*key, gd, ga, g1, g2])
+                         "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2", "all_genes"])
+            for n, key, gd, ga, g1, g2, sm, ec, a0, all_g in rows:
+                wm.writerow([*key, gd, ga, g1, g2, all_g])
     else:
         summ_path = os.path.join(args.outdir, "junction_summary.tsv")
         dis_path = os.path.join(args.outdir, "disagreements.tsv")
@@ -522,14 +526,14 @@ def main():
             ws.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
                          "acceptor_chr", "acceptor_pos", "acceptor_strand",
                          "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
-                         "strand_match", "event_class"])
+                         "strand_match", "event_class", "all_genes"])
             wd.writerow(["n_reads", "sample", "donor_chr", "donor_pos", "donor_strand",
                          "acceptor_chr", "acceptor_pos", "acceptor_strand",
                          "gene_donor", "gene_acceptor", "gene_seg1", "gene_seg2",
                          "gene_donor_any", "gene_acceptor_any", "gene_seg1_any", "gene_seg2_any",
-                         "reasons"])
-            for n, key, gd, ga, g1, g2, sm, ec, a0 in rows:
-                ws.writerow([n, *key, gd, ga, g1, g2, sm, ec])
+                         "reasons", "all_genes"])
+            for n, key, gd, ga, g1, g2, sm, ec, a0, all_g in rows:
+                ws.writerow([n, *key, gd, ga, g1, g2, sm, ec, all_g])
                 reasons = []
                 if a0["donor"] != a0["donor_any"] or a0["acceptor"] != a0["acceptor_any"] \
                    or a0["seg1"] != a0["seg1_any"] or a0["seg2"] != a0["seg2_any"]:
@@ -544,7 +548,7 @@ def main():
                     n_dis += 1
                     wd.writerow([n, *key, gd, ga, g1, g2,
                                  a0["donor_any"], a0["acceptor_any"], a0["seg1_any"], a0["seg2_any"],
-                                 ";".join(reasons)])
+                                 ";".join(reasons), all_g])
 
     print("\n===== done =====")
     print(f"junction lines annotated : {len(reads):,}")
